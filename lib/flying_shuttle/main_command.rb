@@ -8,8 +8,6 @@ module FlyingShuttle
     include Contracts::Core
     include Logging
 
-    option "--dry-run", :flag, "Dry-run", default: false
-
     def execute
       puts "~~ Flying Shuttle v#{FlyingShuttle::VERSION} ~~"
       puts ""
