@@ -9,8 +9,31 @@ pipeline:
     registry: quay.io
     image: plugins/docker
     secrets: [ docker_username, docker_password ]
-    repo: quay.io/kontena/weave-flying-shuttle
+    repo: quay.io/kontena/weave-flying-shuttle-amd64
     dockerfile: Dockerfile
     auto_tag: true
+    when:
+      branches: ['master', 'refs/tags/*']
+
+  qemu-register:
+    image: multiarch/qemu-user-static:register
+    privileged: true
+    when:
+      branches: ['master', 'refs/tags/*']
+
+  docker-arm:
+    registry: quay.io
+    image: plugins/docker
+    secrets: [ docker_username, docker_password ]
+    repo: quay.io/kontena/weave-flying-shuttle-arm64
+    dockerfile: Dockerfile.arm64
+    auto_tag: true
+    when:
+      branches: ['master', 'refs/tags/*']
+
+  qemu-reset:
+    image: multiarch/qemu-user-static:register
+    privileged: true
+    command: [ "--reset" ]
     when:
       branches: ['master', 'refs/tags/*']
