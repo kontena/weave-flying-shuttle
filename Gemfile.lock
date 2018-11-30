@@ -1,0 +1,77 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    clamp (1.3.0)
+    concurrent-ruby (1.1.3)
+    contracts (0.16.0)
+    deep_merge (1.2.1)
+    diff-lcs (1.3)
+    dry-configurable (0.7.0)
+      concurrent-ruby (~> 1.0)
+    dry-container (0.6.0)
+      concurrent-ruby (~> 1.0)
+      dry-configurable (~> 0.1, >= 0.1.3)
+    dry-core (0.4.7)
+      concurrent-ruby (~> 1.0)
+    dry-equalizer (0.2.1)
+    dry-inflector (0.1.2)
+    dry-logic (0.4.2)
+      dry-container (~> 0.2, >= 0.2.6)
+      dry-core (~> 0.2)
+      dry-equalizer (~> 0.2)
+    dry-struct (0.5.1)
+      dry-core (~> 0.4, >= 0.4.3)
+      dry-equalizer (~> 0.2)
+      dry-types (~> 0.13)
+      ice_nine (~> 0.11)
+    dry-types (0.13.3)
+      concurrent-ruby (~> 1.0)
+      dry-container (~> 0.3)
+      dry-core (~> 0.4, >= 0.4.4)
+      dry-equalizer (~> 0.2)
+      dry-inflector (~> 0.1, >= 0.1.2)
+      dry-logic (~> 0.4, >= 0.4.2)
+    excon (0.62.0)
+    hashdiff (0.3.7)
+    ice_nine (0.11.2)
+    jsonpath (0.9.6)
+      multi_json
+      to_regexp (~> 0.2.1)
+    k8s-client (0.6.3)
+      deep_merge (~> 1.2.1)
+      dry-struct (~> 0.5.0)
+      excon (~> 0.62.0)
+      hashdiff (~> 0.3.7)
+      jsonpath (~> 0.9.5)
+      recursive-open-struct (~> 1.1.0)
+      yajl-ruby (~> 1.4.0)
+    multi_json (1.13.1)
+    recursive-open-struct (1.1.0)
+    rspec (3.8.0)
+      rspec-core (~> 3.8.0)
+      rspec-expectations (~> 3.8.0)
+      rspec-mocks (~> 3.8.0)
+    rspec-core (3.8.0)
+      rspec-support (~> 3.8.0)
+    rspec-expectations (3.8.2)
+      diff-lcs (>= 1.2.0, < 2.0)
+      rspec-support (~> 3.8.0)
+    rspec-mocks (3.8.0)
+      diff-lcs (>= 1.2.0, < 2.0)
+      rspec-support (~> 3.8.0)
+    rspec-support (3.8.0)
+    to_regexp (0.2.1)
+    yajl-ruby (1.4.1)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  clamp
+  concurrent-ruby
+  contracts
+  k8s-client
+  rspec
+
+BUNDLED WITH
+   1.16.3
