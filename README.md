@@ -1,5 +1,7 @@
 # Flying Shuttle
 
+> *The flying shuttle was one of the key developments in the industrialization of weaving during the early Industrial Revolution. It allowed a single weaver to weave much wider fabrics - [Wikipedia](https://en.wikipedia.org/wiki/Flying_shuttle)*
+
 Automated Weave Network peer configurer. Intended to run as a sidecar container for Weave Net DaemonSet.
 
 ## Contributing
