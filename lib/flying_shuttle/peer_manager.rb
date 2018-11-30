@@ -10,10 +10,11 @@ module FlyingShuttle
     include Logging
 
     REGION_LABEL = 'failure-domain.beta.kubernetes.io/region'
-    EXTERNAL_ADDRESS_LABEL = 'node-address.pharos.sh/external-ip'
+    EXTERNAL_ADDRESS_LABEL = 'node-address.kontena.io/external-ip'
 
-    def initialize
-      @weave_client = Excon.new('http://127.0.0.1:6784', persistent: true)
+    Contract Excon::Connection => C::Any
+    def initialize(weave_client = Excon.new('http://127.0.0.1:6784', persistent: true))
+      @weave_client = weave_client
       @previous_peers = []
     end
 
