@@ -35,7 +35,7 @@ RSpec.describe FlyingShuttle::PeerManager do
       expect(subject).to receive(:set_peers).with([
         '10.10.100.11', '192.168.100.10'
       ].sort)
-      subject.update_peers(peers)
+      subject.update_peers(peers, [])
     end
   end
 
