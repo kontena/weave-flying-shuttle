@@ -13,13 +13,13 @@ pipeline:
     dockerfile: Dockerfile
     auto_tag: true
     when:
-      branches: ['master', 'refs/tags/*']
+      branch: ['master', 'refs/tags/*']
 
   qemu-register:
     image: multiarch/qemu-user-static:register
     privileged: true
     when:
-      branches: ['master', 'refs/tags/*']
+      branch: ['master', 'refs/tags/*']
 
   docker-arm:
     registry: quay.io
@@ -29,11 +29,11 @@ pipeline:
     dockerfile: Dockerfile.arm64
     auto_tag: true
     when:
-      branches: ['master', 'refs/tags/*']
+      branch: ['master', 'refs/tags/*']
 
   qemu-reset:
     image: multiarch/qemu-user-static:register
     privileged: true
     command: [ "--reset" ]
     when:
-      branches: ['master', 'refs/tags/*']
+      branch: ['master', 'refs/tags/*']
