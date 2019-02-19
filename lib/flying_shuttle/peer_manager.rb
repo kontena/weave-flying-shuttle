@@ -27,15 +27,27 @@ module FlyingShuttle
         begin
           sleep(rand(10.0 ... 30.0))
           peers = client.api('v1').resource('nodes').list
-          update_peers(peers)
+          update_peers(peers, external_addresses)
         rescue => ex
           logger.error { "error while polling: #{ex.message}" }
         end
       end
     end
 
-    Contract C::ArrayOf[K8s::Resource] => C::ArrayOf[String]
-    def update_peers(peers)
+    Contract [] => C::ArrayOf[String]
+    def external_addresses
+      configmap = client.api('v1').resource('configmaps', namespace: 'kube-system').get('flying-shuttle')
+
+      return [] unless configmap.data['known-peers']
+
+      data = JSON.parse(configmap.data['known-peers'])
+      data['peers'] || []
+    rescue K8s::Error::NotFound
+      []
+    end
+
+    Contract C::ArrayOf[K8s::Resource], C::ArrayOf[String] => C::ArrayOf[String]
+    def update_peers(peers, external_addresses)
       this_peer = peers.find { |peer| peer.metadata.name == hostname }
       peers.delete(this_peer)
       peer_addresses = []
@@ -46,6 +58,7 @@ module FlyingShuttle
           peer_addresses << peer.metadata.labels[EXTERNAL_ADDRESS_LABEL]
         end
       end
+      peer_addresses = peer_addresses + external_addresses
       peer_addresses.sort!
 
       if peer_addresses != @previous_peers
