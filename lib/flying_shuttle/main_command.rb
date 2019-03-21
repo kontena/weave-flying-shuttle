@@ -5,7 +5,6 @@ require_relative 'peer_manager'
 
 module FlyingShuttle
   class MainCommand < Clamp::Command
-    include Contracts::Core
     include Logging
 
     def execute

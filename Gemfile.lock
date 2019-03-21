@@ -3,7 +3,6 @@ GEM
   specs:
     clamp (1.3.0)
     concurrent-ruby (1.1.3)
-    contracts (0.16.0)
     deep_merge (1.2.1)
     diff-lcs (1.3)
     dry-configurable (0.7.0)
@@ -31,7 +30,10 @@ GEM
       dry-equalizer (~> 0.2)
       dry-inflector (~> 0.1, >= 0.1.2)
       dry-logic (~> 0.4, >= 0.4.2)
+    ethernet (0.1.3)
+      ffi (>= 1.0.0)
     excon (0.62.0)
+    ffi (1.10.0)
     hashdiff (0.3.7)
     ice_nine (0.11.2)
     jsonpath (0.9.6)
@@ -69,9 +71,9 @@ PLATFORMS
 DEPENDENCIES
   clamp
   concurrent-ruby
-  contracts
+  ethernet
   k8s-client
   rspec
 
 BUNDLED WITH
-   1.16.3
+   1.17.2
