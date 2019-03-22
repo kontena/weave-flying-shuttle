@@ -32,7 +32,8 @@ module FlyingShuttle
             logger.warn "cannot find self from list of peers"
           end
         rescue => ex
-          logger.error { "error while polling: #{ex.message}" }
+          logger.error "error while polling: #{ex.message}"
+          logger.error ex.backtrace.join("\n")
         end
       end
     end

@@ -7,8 +7,11 @@ require_relative 'mixins/logging'
 
 module FlyingShuttle
   class RouteService
+    include Logging
+
     REGION_LABEL = FlyingShuttle::REGION_LABEL
     ROUTE_REGEX = /(\d+\.\d+\.\d+\.\d+) dev weave scope link src \d+\.\d+\.\d+\.\d+/
+    SIOCGIFADDR = 0x8915
 
     attr_reader :this_peer, :peers
 
@@ -57,15 +60,15 @@ module FlyingShuttle
 
     # @return [Array<String>]
     def addresses_needing_route
-      addresses = []
+      needs_route = []
       peers_needing_routes.each do |peer|
         addresses = peer.status.addresses
         address = addresses.find { |addr| addr.type == 'InternalIP' } || addresses.find { |addr| addr.type == 'ExternalIP' }
-        if address && address = address.address
-          addresses << address
+        if address && addr = address.address
+          needs_route << addr
         end
       end
-      addresses
+      needs_route
     end
 
     # @return [Array<K8s::Resource>]
@@ -91,17 +94,27 @@ module FlyingShuttle
     # @param cmd [Array<String>]
     # @return [Array(String, Process::Status)]
     def run_cmd(cmd)
-      Open3.capture2(cmd)
+      Open3.capture2(cmd.join(' '))
     end
 
     # @return [String]
     def weave_interface_ip
-      return @weave_interface_ip if @weave_interface_ip
+      @weave_interface_ip ||= interface_ip('weave')
+    end
 
-      weave = Socket.getifaddrs.find { |ifaddr| ifaddr.name == 'weave' }
-      raise "Cannot find weave ip address" if weave.nil? || weave&.addr&.ip_addr.nil?
-
-      @weave_interface_ip = weave.addr.ip_addr
+    # @param [String] iface
+    # @return [String, NilClass]
+    def interface_ip(iface)
+      sock = UDPSocket.new
+      buf = [iface,""].pack('a16h16')
+      sock.ioctl(SIOCGIFADDR, buf);
+      sock.close
+      buf[20..24].unpack("CCCC").join(".")
+    rescue Errno::EADDRNOTAVAIL
+      # interface is up, but does not have any address configured
+      nil
+    rescue Errno::ENODEV
+      nil
     end
   end
 end
