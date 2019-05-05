@@ -19,6 +19,7 @@ module FlyingShuttle
     end
 
     def poll!
+      peer_service = PeerService.new
       loop do
         begin
           sleep(rand(10.0 ... 30.0))
@@ -26,7 +27,7 @@ module FlyingShuttle
           this_peer = peers.find { |peer| peer.metadata.name == hostname }
           if this_peer
             peers.delete(this_peer)
-            PeerService.new(this_peer).update_peers(peers, external_addresses)
+            peer_service.update_peers(this_peer, peers, external_addresses)
             RouteService.new(this_peer, peers).update_routes
           else
             logger.warn "cannot find self from list of peers"

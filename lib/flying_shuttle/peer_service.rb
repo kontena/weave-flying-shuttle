@@ -9,20 +9,19 @@ module FlyingShuttle
     REGION_LABEL = FlyingShuttle::REGION_LABEL
     EXTERNAL_ADDRESS_LABEL = 'node-address.kontena.io/external-ip'
 
-    attr_reader :this_peer, :weave_client
+    attr_reader :weave_client
 
-    # @param this_peer [K8s::Resource]
     # @param weave_client [Excon]
-    def initialize(this_peer, weave_client: Excon.new('http://127.0.0.1:6784', persistent: true))
-      @this_peer = this_peer
+    def initialize(weave_client: Excon.new('http://127.0.0.1:6784', persistent: true))
       @weave_client = weave_client
       @previous_peers = []
     end
 
+    # @param this_peer [K8s::Resource]
     # @param peers [Array<K8s::Resource>]
     # @param external_addresses [Array<String>]
     # @return [Array<String>]
-    def update_peers(peers, external_addresses)
+    def update_peers(this_peer, peers, external_addresses)
       peer_addresses = []
       peers.each do |peer|
         if peer.metadata.labels[REGION_LABEL] == this_peer.metadata.labels[REGION_LABEL]
