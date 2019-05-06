@@ -7,7 +7,7 @@ RSpec.describe FlyingShuttle::PeerService do
       }
     }
   ) }
-  let(:subject) { described_class.new(this_peer, weave_client: weave_client) }
+  let(:subject) { described_class.new(weave_client: weave_client) }
 
   def build_labeled_node(name, region, external_ip)
     K8s::Resource.new(kind: 'Node', apiVersion: 'v1',
@@ -40,7 +40,7 @@ RSpec.describe FlyingShuttle::PeerService do
       expect(subject).to receive(:set_peers).with([
         '10.10.100.11', '192.168.100.10'
       ].sort)
-      subject.update_peers(peers, [])
+      subject.update_peers(this_peer, peers, [])
     end
   end
 
