@@ -80,10 +80,10 @@ module FlyingShuttle
     # @return [Boolean]
     def remove_route(address)
       logger.info "removing route for #{address} via weave #{weave_interface_ip}"
-      output, _ = run_cmd('ip route')
+      output, _ = run_cmd('ip route list table 10250')
       return true unless output.include?("#{address} dev weave scope link src")
 
-      _, status = run_cmd(['ip route del', address, 'dev weave src', weave_interface_ip])
+      _, status = run_cmd(['ip route del table 10250', address, 'dev weave src', weave_interface_ip])
       status.success?
     end
 
