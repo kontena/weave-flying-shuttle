@@ -25,7 +25,7 @@ module FlyingShuttle
       peer_addresses = []
       peers.each do |peer|
         if peer.metadata.labels[REGION_LABEL] == this_peer.metadata.labels[REGION_LABEL]
-          address = peer.status.addresses.find { |addr| addr.type == 'InternalIP'}&.address
+          address = peer.status.addresses.find { |addr| addr.type == 'InternalIP' }&.address
           peer_addresses << address if address
         else
           address = peer.metadata.labels[EXTERNAL_ADDRESS_LABEL]

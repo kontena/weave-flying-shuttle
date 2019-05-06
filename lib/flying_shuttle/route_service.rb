@@ -27,11 +27,9 @@ module FlyingShuttle
     def update_routes
       addresses = addresses_needing_route
       logger.info "addresses needing route: #{addresses.join(',')}"
-      output, _ = run_cmd(['ip', 'rule', 'list', 'lookup', '10250'])
-      if output.strip.empty?
-        run_cmd(['ip',  'rule', 'add', 'fwmark', '10250', 'table', '10250'])
-        run_cmd(['ip', 'route', 'flush', 'cache'])
-      end
+      loosen_rp_filter
+      ensure_ip_rule
+      masquerade_marked
       current_addresses = currently_routed_addresses
       (addresses - current_addresses).each do |address|
         ensure_route(address)
@@ -43,18 +41,38 @@ module FlyingShuttle
       (addresses - current_addresses)
     end
 
+    def loosen_rp_filter
+      run_cmd('echo 2 > /proc/sys/net/ipv4/conf/all/rp_filter')
+    end
+
+    def ensure_ip_rule
+      output, _ = run_cmd('ip rule list lookup 10250')
+      if output.strip.empty?
+        run_cmd('ip rule add fwmark 10250 table 10250')
+        run_cmd('ip route flush cache')
+      end
+    end
+
+    def masquerade_marked
+      iptables_params = '-t nat -m mark --mark 10250 -o weave -j MASQUERADE'
+      _, status = run_cmd('iptables -C POSTROUTING ' + iptables_params)
+      unless status.success?
+        run_cmd('iptables -I POSTROUTING 1 ' + iptables_params)
+      end
+    end
+
     # @param address [String]
     # @return [Boolean]
     def ensure_route(address)
-      output, _ = run_cmd(['ip', 'route', 'get', address, 'mark', '10250'])
-      return true if output.include?("#{address} dev weave table 10250 src")
-
-      iptables_params = ['OUTPUT', '-t', 'mangle', '-p', 'tcp', '-d', address, '--dport', '10250', '-j', 'MARK', '--set-mark', '10250']
+      iptables_params = ['OUTPUT -t mangle -p tcp -d', address, '--dport 10250 -j MARK --set-mark 10250']
       _, status = run_cmd(['iptables', '-C'] + iptables_params)
       run_cmd(['iptables', '-A'] + iptables_params) unless status.success?
 
+      output, _ = run_cmd(['ip route get', address, 'mark 10250'])
+      return true if output.include?("#{address} dev weave table 10250 src")
+
       logger.info "adding route for #{address} via weave #{weave_interface_ip}"
-      _, status = run_cmd(['ip', 'route', 'add', 'table', '10250', address, 'dev', 'weave', 'src', weave_interface_ip])
+      _, status = run_cmd(['ip route add table 10250', address, 'dev weave src', weave_interface_ip])
       status.success?
     end
 
@@ -62,10 +80,10 @@ module FlyingShuttle
     # @return [Boolean]
     def remove_route(address)
       logger.info "removing route for #{address} via weave #{weave_interface_ip}"
-      output, _ = run_cmd(['ip', 'route'])
+      output, _ = run_cmd('ip route')
       return true unless output.include?("#{address} dev weave scope link src")
 
-      _, status = run_cmd(['ip', 'route', 'del', address, 'dev', 'weave', 'src', weave_interface_ip])
+      _, status = run_cmd(['ip route del', address, 'dev weave src', weave_interface_ip])
       status.success?
     end
 
@@ -76,8 +94,7 @@ module FlyingShuttle
         addresses = peer.status.addresses
         address = addresses.find { |addr| addr.type == 'InternalIP' } || addresses.find { |addr| addr.type == 'ExternalIP' }
         if address && addr = address.address
-          ip = IPAddr.new(addr)
-          needs_route << addr if ip.private?
+          needs_route << addr
         end
       end
       needs_route
@@ -93,7 +110,7 @@ module FlyingShuttle
     # @return [Array<String>]
     def currently_routed_addresses
       addresses = []
-      output, _ = run_cmd(['ip', 'route'])
+      output, _ = run_cmd('ip route')
       output.lines.each do |line|
         if match = line.strip.match(ROUTE_REGEX)
           addresses << match.captures.first
@@ -103,11 +120,12 @@ module FlyingShuttle
       addresses
     end
 
-    # @param cmd [Array<String>]
+    # @param cmd [Array<String>, String]
     # @return [Array(String, Process::Status)]
     def run_cmd(cmd)
-      logger.info "running command: #{cmd.join(' ')}"
-      Open3.capture2(cmd.join(' '))
+      cmd = cmd.is_a?(Array) ? cmd.join(' ') : cmd
+      logger.info "running command: #{cmd}"
+      Open3.capture2(cmd)
     end
 
     # @return [String]

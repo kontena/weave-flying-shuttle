@@ -1,6 +1,10 @@
 RSpec.describe FlyingShuttle::RouteService do
   let(:subject) { described_class.new(double(:this_peer), []) }
 
+  before(:each) do
+    allow(Open3).to receive(:capture2).and_return(['', double(:status, success?: true)])
+  end
+
   describe "#currently_routed_addresses" do
     it "returns addresses" do
       output = <<~OUTPUT
@@ -9,7 +13,7 @@ RSpec.describe FlyingShuttle::RouteService do
         10.9.145.76 dev weave scope link src 10.40.0.0
         172.31.1.1 dev eth0 scope link
       OUTPUT
-      allow(subject).to receive(:run_cmd).with(['ip', 'route']).and_return(output, double(:status))
+      allow(subject).to receive(:run_cmd).with('ip route').and_return(output, double(:status))
       addresses = subject.currently_routed_addresses
       expect(addresses).to eq(['10.9.145.75', '10.9.145.76'])
     end
@@ -43,6 +47,20 @@ RSpec.describe FlyingShuttle::RouteService do
       expect(subject).not_to receive(:ensure_route)
       expect(subject).not_to receive(:remove_route)
       subject.update_routes
+    end
+  end
+
+  describe "#run_cmd" do
+    it "accepts string" do
+      cmd = "ls -l"
+      expect(Open3).to receive(:capture2).with(cmd)
+      subject.run_cmd(cmd)
+    end
+
+    it "accepts array" do
+      cmd = ["ls", "-l"]
+      expect(Open3).to receive(:capture2).with(cmd.join(' '))
+      subject.run_cmd(cmd)
     end
   end
 end
