@@ -110,7 +110,7 @@ module FlyingShuttle
     # @return [Array<String>]
     def currently_routed_addresses
       addresses = []
-      output, _ = run_cmd('ip route')
+      output, _ = run_cmd('ip route list table 10250')
       output.lines.each do |line|
         if match = line.strip.match(ROUTE_REGEX)
           addresses << match.captures.first
