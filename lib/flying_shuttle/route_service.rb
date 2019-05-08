@@ -90,13 +90,13 @@ module FlyingShuttle
       output.lines.each do |line|
         if match = line.strip.match(/.+weave-fs-ip=(\S+).+/)
           address = match.captures.first
-          if peer = @peers.find { |peer| peer.peer_address&.address == address }
+          if peer = peers.find { |peer| peer.peer_address&.address == address }
             current_peers << peer
           end
         end
       end
 
-      current_peers
+      current_peers.uniq
     end
 
     # @param cmd [Array<String>, String]
