@@ -10,7 +10,7 @@ module FlyingShuttle
     include WeaveHelper
 
     REGION_LABEL = FlyingShuttle::REGION_LABEL
-    IPTABLES_DNAT = 'iptables %s -t nat -p tcp -d %s --dport 10250  -j DNAT --to-destination %s:10250'
+    IPTABLES_DNAT = 'iptables %s -w -t nat -p tcp -d %s --dport 10250  -j DNAT --to-destination %s:10250'
 
     attr_reader :this_peer, :peers
 
@@ -30,7 +30,7 @@ module FlyingShuttle
       (peers - current_peers).each do |peer|
         ensure_route(peer)
       end
-      (current_peers - peers).each do |peer|
+      orphan_peers.each do |peer|
         remove_route(peer)
       end
 
@@ -48,14 +48,14 @@ module FlyingShuttle
 
       address = peer.peer_address.address
 
-      _, output = run_cmd(IPTABLES_DNAT % ['-C OUTPUT', address, dest_address, address])
-      _, prerouting = run_cmd(IPTABLES_DNAT % ['-C PREROUTING', address, dest_address, address])
+      _, output = run_cmd(IPTABLES_DNAT % ['-C OUTPUT', address, dest_address])
+      _, prerouting = run_cmd(IPTABLES_DNAT % ['-C PREROUTING', address, dest_address])
       return true if output.success? && prerouting.success?
 
       logger.info "adding DNAT for #{address} via weave #{dest_address}"
       comment = ' -m comment --comment "weave-fs-ip=%s"' % [address]
-      _, output = run_cmd(IPTABLES_DNAT % ['-I OUTPUT 1', address, dest_address, address] + comment) unless output.success?
-      _, prerouting = run_cmd(IPTABLES_DNAT % ['-I PREROUTING 1', address, dest_address, address] + comment) unless prerouting.success?
+      _, output = run_cmd(IPTABLES_DNAT % ['-I OUTPUT 1', address, dest_address] + comment) unless output.success?
+      _, prerouting = run_cmd(IPTABLES_DNAT % ['-I PREROUTING 1', address, dest_address] + comment) unless prerouting.success?
 
       output.success? && prerouting.success?
     end
@@ -67,13 +67,19 @@ module FlyingShuttle
       return false unless dest_address
 
       address = peer.peer_address.address
-      _, status = run_cmd(IPTABLES_DNAT % ['-C', address, dest_address, address])
-      return false unless status.success?
+      comment = ' -m comment --comment "weave-fs-ip=%s"' % [address]
+      _, output = run_cmd(IPTABLES_DNAT % ['-C OUTPUT', address, dest_address] + comment)
+      _, prerouting = run_cmd(IPTABLES_DNAT % ['-C PREROUTING', address, dest_address] + comment)
+      if !output.success? && !prerouting.success?
+        logger.info "did not find matching DNAT rules for #{address}.. maybe they have already removed"
+        return true
+      end
 
       logger.info "removing DNAT for #{address} via weave #{dest_address}"
-      _, status = run_cmd(IPTABLES_DNAT % ['-D', address, dest_address, address]) unless status.success?
+      _, output = run_cmd(IPTABLES_DNAT % ['-D OUTPUT', address, dest_address] + comment) if output.success?
+      _, prerouting = run_cmd(IPTABLES_DNAT % ['-D PREROUTING', address, dest_address] + comment) if prerouting.success?
 
-      status.success?
+      output.success? && prerouting.success?
     end
 
     # @return [Array<FlyingShuttle::Peer>]
@@ -97,6 +103,34 @@ module FlyingShuttle
       end
 
       current_peers.uniq
+    end
+
+    # @return [Array<FlyingShuttle::Peer>]
+    def orphan_peers
+      orphan_peers = []
+      output, _ = run_cmd('iptables -L -n -t nat')
+      output.lines.each do |line|
+        if match = line.strip.match(/.+weave-fs-ip=(\S+).+to:(\S+):10250/)
+          address = match.captures[0]
+          bridge_ip = match.captures[1]
+          unless peers.find { |peer| peer.peer_address&.address == address }
+            orphan_peers << FlyingShuttle::Peer.new(K8s::Resource.new({
+              metadata: {
+                annotations: {
+                  'weave.kontena.io/bridge-ip' => bridge_ip
+                }
+              },
+              status: {
+                addresses: [
+                  { type: 'InternalIP', address: address }
+                ]
+              }
+            }))
+          end
+        end
+      end
+
+      orphan_peers.uniq
     end
 
     # @param cmd [Array<String>, String]
