@@ -8,7 +8,6 @@ module FlyingShuttle
     include Logging
     include WeaveHelper
 
-    REGION_LABEL = FlyingShuttle::REGION_LABEL
     EXTERNAL_ADDRESS_LABEL = 'node-address.kontena.io/external-ip'
 
     def initialize
