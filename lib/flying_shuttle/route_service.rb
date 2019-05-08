@@ -1,18 +1,16 @@
 # frozen_string_literal: true
 
-require 'socket'
 require 'open3'
-require 'ipaddr'
-require_relative 'mixins/client_helper'
+require_relative 'mixins/weave_helper'
 require_relative 'mixins/logging'
 
 module FlyingShuttle
   class RouteService
     include Logging
+    include WeaveHelper
 
     REGION_LABEL = FlyingShuttle::REGION_LABEL
-    ROUTE_REGEX = /(\d+\.\d+\.\d+\.\d+) dev weave scope link src \d+\.\d+\.\d+\.\d+/
-    SIOCGIFADDR = 0x8915
+    IPTABLES_DNAT = 'iptables %s -t nat -p tcp -d %s --dport 10250  -j DNAT --to-destination %s:10250'
 
     attr_reader :this_peer, :peers
 
@@ -23,129 +21,90 @@ module FlyingShuttle
       @peers = peers
     end
 
-    # @return [Array<String>] added routes
+    # @return [Array<FlyingShuttle>] added routes
     def update_routes
-      addresses = addresses_needing_route
-      logger.info "addresses needing route: #{addresses.join(',')}"
-      loosen_rp_filter
-      ensure_ip_rule
-      masquerade_marked
-      current_addresses = currently_routed_addresses
-      (addresses - current_addresses).each do |address|
-        ensure_route(address)
+      peers = peers_needing_routes
+      logger.debug "peers needing route: #{peers.map(&:name).join(',')}"
+      current_peers = currently_routed_peers
+
+      (peers - current_peers).each do |peer|
+        ensure_route(peer)
       end
-      (current_addresses - addresses).each do |address|
-        remove_route(address)
+      (current_peers - peers).each do |peer|
+        remove_route(peer)
       end
 
-      (addresses - current_addresses)
+      (peers - current_peers)
     end
 
-    def loosen_rp_filter
-      run_cmd('echo 2 > /proc/sys/net/ipv4/conf/all/rp_filter')
-    end
-
-    def ensure_ip_rule
-      output, _ = run_cmd('ip rule list lookup 10250')
-      if output.strip.empty?
-        run_cmd('ip rule add fwmark 10250 table 10250')
-        run_cmd('ip route flush cache')
-      end
-    end
-
-    def masquerade_marked
-      iptables_params = '-t nat -m mark --mark 10250 -o weave -j MASQUERADE'
-      _, status = run_cmd('iptables -C POSTROUTING ' + iptables_params)
-      unless status.success?
-        run_cmd('iptables -I POSTROUTING 1 ' + iptables_params)
-      end
-    end
-
-    # @param address [String]
+    # @param peer [FlyingShuttle::Peer]
     # @return [Boolean]
-    def ensure_route(address)
-      iptables_params = ['OUTPUT -t mangle -p tcp -d', address, '--dport 10250 -j MARK --set-mark 10250']
-      _, status = run_cmd(['iptables', '-C'] + iptables_params)
-      run_cmd(['iptables', '-A'] + iptables_params) unless status.success?
+    def ensure_route(peer)
+      dest_address = peer.weave_interface_ip
+      unless dest_address
+        logger.error "cannot find weave bridge for #{peer.name}"
+        return false
+      end
 
-      output, _ = run_cmd(['ip route get', address, 'mark 10250'])
-      return true if output.include?("#{address} dev weave table 10250 src")
+      address = peer.peer_address.address
 
-      logger.info "adding route for #{address} via weave #{weave_interface_ip}"
-      _, status = run_cmd(['ip route add table 10250', address, 'dev weave src', weave_interface_ip])
+      _, output = run_cmd(IPTABLES_DNAT % ['-C OUTPUT', address, dest_address, address])
+      _, prerouting = run_cmd(IPTABLES_DNAT % ['-C PREROUTING', address, dest_address, address])
+      return true if output.success? && prerouting.success?
+
+      logger.info "adding DNAT for #{address} via weave #{dest_address}"
+      comment = ' -m comment --comment "weave-fs-ip=%s"' % [address]
+      _, output = run_cmd(IPTABLES_DNAT % ['-I OUTPUT 1', address, dest_address, address] + comment) unless output.success?
+      _, prerouting = run_cmd(IPTABLES_DNAT % ['-I PREROUTING 1', address, dest_address, address] + comment) unless prerouting.success?
+
+      output.success? && prerouting.success?
+    end
+
+    # @param peer [FlyingShuttle::Peer]
+    # @return [Boolean]
+    def remove_route(peer)
+      dest_address = peer.weave_interface_ip
+      return false unless dest_address
+
+      address = peer.peer_address.address
+      _, status = run_cmd(IPTABLES_DNAT % ['-C', address, dest_address, address])
+      return false unless status.success?
+
+      logger.info "removing DNAT for #{address} via weave #{dest_address}"
+      _, status = run_cmd(IPTABLES_DNAT % ['-D', address, dest_address, address]) unless status.success?
+
       status.success?
     end
 
-    # @param address [String]
-    # @return [Boolean]
-    def remove_route(address)
-      logger.info "removing route for #{address} via weave #{weave_interface_ip}"
-      output, _ = run_cmd('ip route list table 10250')
-      return true unless output.include?("#{address} dev weave scope link src")
-
-      _, status = run_cmd(['ip route del table 10250', address, 'dev weave src', weave_interface_ip])
-      status.success?
-    end
-
-    # @return [Array<String>]
-    def addresses_needing_route
-      needs_route = []
-      peers_needing_routes.each do |peer|
-        addresses = peer.status.addresses
-        address = addresses.find { |addr| addr.type == 'InternalIP' } || addresses.find { |addr| addr.type == 'ExternalIP' }
-        if address && addr = address.address
-          needs_route << addr
-        end
-      end
-      needs_route
-    end
-
-    # @return [Array<K8s::Resource>]
+    # @return [Array<FlyingShuttle::Peer>]
     def peers_needing_routes
       peers.select do |peer|
-        peer.metadata.labels[REGION_LABEL] != this_peer.metadata.labels[REGION_LABEL]
+        peer.region != this_peer.region && peer.peer_address&.address
       end
     end
 
-    # @return [Array<String>]
-    def currently_routed_addresses
-      addresses = []
-      output, _ = run_cmd('ip route list table 10250')
+    # @return [Array<FlyingShuttle::Peer>]
+    def currently_routed_peers
+      current_peers = []
+      output, _ = run_cmd('iptables -L -n -t nat')
       output.lines.each do |line|
-        if match = line.strip.match(ROUTE_REGEX)
-          addresses << match.captures.first
+        if match = line.strip.match(/.+weave-fs-ip=(\S+).+/)
+          address = match.captures.first
+          if peer = @peers.find { |peer| peer.peer_address&.address == address }
+            current_peers << peer
+          end
         end
       end
 
-      addresses
+      current_peers
     end
 
     # @param cmd [Array<String>, String]
     # @return [Array(String, Process::Status)]
     def run_cmd(cmd)
       cmd = cmd.is_a?(Array) ? cmd.join(' ') : cmd
-      logger.info "running command: #{cmd}"
-      Open3.capture2(cmd)
-    end
-
-    # @return [String]
-    def weave_interface_ip
-      @weave_interface_ip ||= interface_ip('weave')
-    end
-
-    # @param [String] iface
-    # @return [String, NilClass]
-    def interface_ip(iface)
-      sock = UDPSocket.new
-      buf = [iface,""].pack('a16h16')
-      sock.ioctl(SIOCGIFADDR, buf);
-      sock.close
-      buf[20..24].unpack("CCCC").join(".")
-    rescue Errno::EADDRNOTAVAIL
-      # interface is up, but does not have any address configured
-      nil
-    rescue Errno::ENODEV
-      nil
+      logger.debug "running command: #{cmd}"
+      Open3.capture2e(cmd)
     end
   end
 end

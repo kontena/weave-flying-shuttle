@@ -1,19 +1,17 @@
 # frozen_string_literal: true
 
 require_relative "mixins/logging"
+require_relative "mixins/weave_helper"
 
 module FlyingShuttle
   class PeerService
     include Logging
+    include WeaveHelper
 
     REGION_LABEL = FlyingShuttle::REGION_LABEL
     EXTERNAL_ADDRESS_LABEL = 'node-address.kontena.io/external-ip'
 
-    attr_reader :weave_client
-
-    # @param weave_client [Excon]
-    def initialize(weave_client: Excon.new('http://127.0.0.1:6784', persistent: true))
-      @weave_client = weave_client
+    def initialize
       @previous_peers = []
     end
 
@@ -24,8 +22,8 @@ module FlyingShuttle
     def update_peers(this_peer, peers, external_addresses)
       peer_addresses = []
       peers.each do |peer|
-        if peer.metadata.labels[REGION_LABEL] == this_peer.metadata.labels[REGION_LABEL]
-          address = peer.status.addresses.find { |addr| addr.type == 'InternalIP' }&.address
+        if peer.region == this_peer.region
+          address = peer.address_for('InternalIP')&.address
           peer_addresses << address if address
         else
           address = peer.metadata.labels[EXTERNAL_ADDRESS_LABEL]
