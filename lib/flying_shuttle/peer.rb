@@ -5,8 +5,6 @@ module FlyingShuttle
   class Peer
     extend Forwardable
 
-    REGION_LABEL = FlyingShuttle::REGION_LABEL
-
     attr_reader :node
 
     def_delegators :@node, :status, :metadata

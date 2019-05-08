@@ -1,16 +1,22 @@
 RSpec.describe FlyingShuttle::PeerService do
   let(:weave_client) { double(:weave_client) }
-  let(:this_peer) { K8s::Resource.new(
-    metadata: {
-      labels: {
-        'failure-domain.beta.kubernetes.io/region' => 'eu-west-1'
+  let(:this_peer) do
+    node = K8s::Resource.new(
+      metadata: {
+        labels: {
+          'failure-domain.beta.kubernetes.io/region' => 'eu-west-1'
+        }
       }
-    }
-  ) }
-  let(:subject) { described_class.new(weave_client: weave_client) }
+    )
+    FlyingShuttle::Peer.new(node)
+  end
+
+  before(:each) do
+    allow(subject).to receive(:weave_client).and_return(weave_client)
+  end
 
   def build_labeled_node(name, region, external_ip)
-    K8s::Resource.new(kind: 'Node', apiVersion: 'v1',
+    node = K8s::Resource.new(kind: 'Node', apiVersion: 'v1',
       metadata: {
         name: name,
         labels: {
@@ -20,10 +26,11 @@ RSpec.describe FlyingShuttle::PeerService do
       },
       status: {
         addresses: [
-          { type: 'InternalIP', address: external_ip.sub('192.168', '10.10')}
+          { type: 'InternalIP', address: external_ip.sub('192.168', '10.10') }
         ]
       }
     )
+    FlyingShuttle::Peer.new(node)
   end
 
   describe '#update_peers' do
