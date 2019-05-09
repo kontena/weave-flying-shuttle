@@ -1,39 +1,51 @@
-pipeline:
-  test:
+kind: pipeline
+name: amd64
+platform:
+  os: linux
+  arch: amd64
+steps:
+  - name: test
     image: ruby:2.5
     commands:
       - bundle install
       - bundle exec rspec
       - ./bin/flying-shuttle -h
-  docker:
-    registry: quay.io
+  - name: docker
     image: plugins/docker
-    secrets: [ docker_username, docker_password ]
-    repo: quay.io/kontena/weave-flying-shuttle-amd64
-    dockerfile: Dockerfile
-    auto_tag: true
+    settings:
+      registry: quay.io
+      username:
+        from_secret: docker_username
+      password:
+        from_secret: docker_password
+      repo: quay.io/kontena/weave-flying-shuttle-amd64
+      dockerfile: Dockerfile
+      auto_tag: true
     when:
       branch: ['master', 'refs/tags/*']
-
-  qemu-register:
-    image: multiarch/qemu-user-static:register
-    privileged: true
-    when:
-      branch: ['master', 'refs/tags/*']
-
-  docker-arm:
-    registry: quay.io
+---
+kind: pipeline
+name: arm64
+platform:
+  os: linux
+  arch: arm64
+steps:
+  - name: test
+    image: ruby:2.5
+    commands:
+      - bundle install
+      - bundle exec rspec
+      - ./bin/flying-shuttle -h
+  - name: docker
     image: plugins/docker
-    secrets: [ docker_username, docker_password ]
-    repo: quay.io/kontena/weave-flying-shuttle-arm64
-    dockerfile: Dockerfile.arm64
-    auto_tag: true
-    when:
-      branch: ['master', 'refs/tags/*']
-
-  qemu-reset:
-    image: multiarch/qemu-user-static:register
-    privileged: true
-    command: [ "--reset" ]
+    settings:
+      registry: quay.io
+      username:
+        from_secret: docker_username
+      password:
+        from_secret: docker_password
+      repo: quay.io/kontena/weave-flying-shuttle-arm64
+      dockerfile: Dockerfile
+      auto_tag: true
     when:
       branch: ['master', 'refs/tags/*']

@@ -1,20 +1,20 @@
 # frozen_string_literal: true
 
+require 'socket'
 require_relative 'mixins/client_helper'
 require_relative 'mixins/logging'
+require_relative 'peer'
+require_relative 'peer_service'
+require_relative 'route_service'
 
 module FlyingShuttle
   class PeerManager
-    include Contracts::Core
     include ClientHelper
     include Logging
 
-    REGION_LABEL = 'failure-domain.beta.kubernetes.io/region'
-    EXTERNAL_ADDRESS_LABEL = 'node-address.kontena.io/external-ip'
+    SIOCGIFADDR = 0x8915
 
-    Contract Excon::Connection => C::Any
-    def initialize(weave_client = Excon.new('http://127.0.0.1:6784', persistent: true))
-      @weave_client = weave_client
+    def initialize
       @previous_peers = []
     end
 
@@ -23,18 +23,43 @@ module FlyingShuttle
     end
 
     def poll!
+      peer_service = PeerService.new
       loop do
         begin
+          peers = client.api('v1').resource('nodes').list.map { |node| Peer.new(node) }
+          this_peer = peers.find { |peer| peer.name == hostname }
+          if this_peer
+            update_node_annotations(this_peer)
+            peers.delete(this_peer)
+            peer_service.update_peers(this_peer, peers, external_addresses)
+            RouteService.new(this_peer, peers).update_routes
+          else
+            logger.warn "cannot find self from list of peers"
+          end
           sleep(rand(10.0 ... 30.0))
-          peers = client.api('v1').resource('nodes').list
-          update_peers(peers, external_addresses)
         rescue => ex
-          logger.error { "error while polling: #{ex.message}" }
+          logger.error "error while polling: #{ex.message}"
+          logger.error ex.backtrace.join("\n")
+          sleep 1
         end
       end
     end
 
-    Contract [] => C::ArrayOf[String]
+    # @param peer [FlyingShuttle::Peer]
+    def update_node_annotations(peer)
+      return if peer.weave_interface_ip.to_s == weave_interface_ip
+
+      peer.weave_interface_ip = weave_interface_ip
+      client.api('v1').resource('nodes').merge_patch(peer.name, {
+        metadata: {
+          annotations: {
+            'weave.kontena.io/bridge-ip' => weave_interface_ip
+          }
+        }
+      })
+    end
+
+    # @return [Array<String>]
     def external_addresses
       configmap = client.api('v1').resource('configmaps', namespace: 'kube-system').get('flying-shuttle')
 
@@ -46,48 +71,29 @@ module FlyingShuttle
       []
     end
 
-    Contract C::ArrayOf[K8s::Resource], C::ArrayOf[String] => C::ArrayOf[String]
-    def update_peers(peers, external_addresses)
-      this_peer = peers.find { |peer| peer.metadata.name == hostname }
-      peers.delete(this_peer)
-      peer_addresses = []
-      peers.each do |peer|
-        if peer.metadata.labels[REGION_LABEL] == this_peer.metadata.labels[REGION_LABEL]
-          peer_addresses << peer.status.addresses.find { |addr| addr.type == 'InternalIP'}.address
-        else
-          peer_addresses << peer.metadata.labels[EXTERNAL_ADDRESS_LABEL]
-        end
-      end
-      peer_addresses = peer_addresses + external_addresses
-      peer_addresses.sort!
-
-      if peer_addresses != @previous_peers
-        logger.info { "peers: #{peer_addresses.join(',')}" }
-        set_peers(peer_addresses)
-      else
-        logger.info { "no changes detected" }
-      end
-
-      peer_addresses
-    end
-
-    Contract C::ArrayOf[String] => C::Bool
-    def set_peers(peer_addresses)
-      peers = peer_addresses.map { |addr| "peer[]=#{addr}"}.join("&")
-      response = @weave_client.post(
-        path: "/connect",
-        body: "#{peers}&replace=true",
-        headers: { "Content-Type" => "application/x-www-form-urlencoded" }
-      )
-      return false unless response.status == 200
-
-      @previous_peers = peer_addresses
-
-      true
-    end
-
+    # @return [String]
     def hostname
       ENV.fetch('HOSTNAME')
+    end
+
+    # @return [String]
+    def weave_interface_ip
+      @weave_interface_ip ||= interface_ip('weave')
+    end
+
+    # @param [String] iface
+    # @return [String, NilClass]
+    def interface_ip(iface)
+      sock = UDPSocket.new
+      buf = [iface,""].pack('a16h16')
+      sock.ioctl(SIOCGIFADDR, buf);
+      sock.close
+      buf[20..24].unpack("CCCC").join(".")
+    rescue Errno::EADDRNOTAVAIL
+      # interface is up, but does not have any address configured
+      nil
+    rescue Errno::ENODEV
+      nil
     end
   end
 end

@@ -8,7 +8,7 @@ module FlyingShuttle
       return @logger if @logger
 
       @logger = Logger.new(STDOUT)
-      @logger.progname = self.class.name.sub('PCO::', '')
+      @logger.progname = self.class.name.delete_prefix('FlyingShuttle::')
       if ENV['DEBUG'].to_s == 'true'
         @logger.level = Logger::DEBUG
       else
