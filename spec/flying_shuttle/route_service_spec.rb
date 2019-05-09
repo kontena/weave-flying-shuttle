@@ -51,6 +51,10 @@ RSpec.describe FlyingShuttle::RouteService do
       described_class.new(double(:this_peer), peers)
     end
 
+    before(:each) do
+      allow(subject).to receive(:orphan_peers).and_return([])
+    end
+
     it "adds new routes" do
       allow(subject).to receive(:peers_needing_routes).and_return(peers)
       allow(subject).to receive(:currently_routed_peers).and_return([])
@@ -75,6 +79,18 @@ RSpec.describe FlyingShuttle::RouteService do
       allow(subject).to receive(:currently_routed_peers).and_return(peers)
       expect(subject).not_to receive(:ensure_route)
       expect(subject).not_to receive(:remove_route)
+      subject.update_routes
+    end
+
+    it "removes rules for orphan peers" do
+      orphan_peers = [
+        double(:peer)
+      ]
+      allow(subject).to receive(:peers_needing_routes).and_return(peers)
+      allow(subject).to receive(:currently_routed_peers).and_return(peers)
+
+      expect(subject).to receive(:orphan_peers).and_return(orphan_peers)
+      expect(subject).to receive(:remove_route).with(orphan_peers[0])
       subject.update_routes
     end
   end

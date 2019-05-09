@@ -10,7 +10,7 @@ module FlyingShuttle
     include WeaveHelper
 
     REGION_LABEL = FlyingShuttle::REGION_LABEL
-    IPTABLES_DNAT = 'iptables %s -w -t nat -p tcp -d %s --dport 10250  -j DNAT --to-destination %s:10250'
+    IPTABLES_DNAT = 'iptables %{action} -w -t nat -p tcp -d %{target} --dport 10250  -j DNAT --to-destination %{destination}:10250'
 
     attr_reader :this_peer, :peers
 
@@ -48,14 +48,14 @@ module FlyingShuttle
 
       address = peer.peer_address.address
 
-      _, output = run_cmd(IPTABLES_DNAT % ['-C OUTPUT', address, dest_address])
-      _, prerouting = run_cmd(IPTABLES_DNAT % ['-C PREROUTING', address, dest_address])
+      _, output = run_cmd(IPTABLES_DNAT % { action: '-C OUTPUT', target: address, destination: dest_address})
+      _, prerouting = run_cmd(IPTABLES_DNAT % { action: '-C PREROUTING', target: address, destination: dest_address})
       return true if output.success? && prerouting.success?
 
       logger.info "adding DNAT for #{address} via weave #{dest_address}"
       comment = ' -m comment --comment "weave-fs-ip=%s"' % [address]
-      _, output = run_cmd(IPTABLES_DNAT % ['-I OUTPUT 1', address, dest_address] + comment) unless output.success?
-      _, prerouting = run_cmd(IPTABLES_DNAT % ['-I PREROUTING 1', address, dest_address] + comment) unless prerouting.success?
+      _, output = run_cmd(IPTABLES_DNAT % { action: '-I OUTPUT 1', target: address, destination: dest_address } + comment) unless output.success?
+      _, prerouting = run_cmd(IPTABLES_DNAT % { action: '-I PREROUTING 1', target: address, destination: dest_address } + comment) unless prerouting.success?
 
       output.success? && prerouting.success?
     end
@@ -68,16 +68,16 @@ module FlyingShuttle
 
       address = peer.peer_address.address
       comment = ' -m comment --comment "weave-fs-ip=%s"' % [address]
-      _, output = run_cmd(IPTABLES_DNAT % ['-C OUTPUT', address, dest_address] + comment)
-      _, prerouting = run_cmd(IPTABLES_DNAT % ['-C PREROUTING', address, dest_address] + comment)
+      _, output = run_cmd(IPTABLES_DNAT % { action: '-C OUTPUT', target: address, destination: dest_address } + comment)
+      _, prerouting = run_cmd(IPTABLES_DNAT % { action: '-C PREROUTING', target: address, destination: dest_address } + comment)
       if !output.success? && !prerouting.success?
         logger.info "did not find matching DNAT rules for #{address}.. maybe they have already removed"
         return true
       end
 
       logger.info "removing DNAT for #{address} via weave #{dest_address}"
-      _, output = run_cmd(IPTABLES_DNAT % ['-D OUTPUT', address, dest_address] + comment) if output.success?
-      _, prerouting = run_cmd(IPTABLES_DNAT % ['-D PREROUTING', address, dest_address] + comment) if prerouting.success?
+      _, output = run_cmd(IPTABLES_DNAT % { action: '-D OUTPUT', target: address, destination: dest_address } + comment) if output.success?
+      _, prerouting = run_cmd(IPTABLES_DNAT % { action: '-D PREROUTING', target: address, destination: dest_address } + comment) if prerouting.success?
 
       output.success? && prerouting.success?
     end
