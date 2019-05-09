@@ -71,7 +71,7 @@ module FlyingShuttle
       _, output = run_cmd(IPTABLES_DNAT % { action: '-C OUTPUT', target: address, destination: dest_address } + comment)
       _, prerouting = run_cmd(IPTABLES_DNAT % { action: '-C PREROUTING', target: address, destination: dest_address } + comment)
       if !output.success? && !prerouting.success?
-        logger.info "did not find matching DNAT rules for #{address}.. maybe they have already removed"
+        logger.info "did not find matching DNAT rules for #{address}.. maybe it's already removed"
         return true
       end
 
