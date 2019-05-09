@@ -22,10 +22,10 @@ module FlyingShuttle
       peer_addresses = []
       peers.each do |peer|
         if peer.region == this_peer.region
-          address = peer.address_for('InternalIP')&.address
+          address = peer.address_for('InternalIP')&.address || peer.address_for('ExternalIP')&.address
           peer_addresses << address if address
         else
-          address = peer.metadata.labels[EXTERNAL_ADDRESS_LABEL]
+          address = peer.address_for('ExternalIP')&.address || peer.metadata.labels[EXTERNAL_ADDRESS_LABEL]
           peer_addresses << address if address
         end
       end
