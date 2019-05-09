@@ -22,9 +22,7 @@ steps:
       dockerfile: Dockerfile
       auto_tag: true
     when:
-      ref:
-      - refs/heads/master
-      - refs/tags/*
+      event: [tag, push]
 ---
 kind: pipeline
 name: arm64
@@ -50,6 +48,4 @@ steps:
       dockerfile: Dockerfile
       auto_tag: true
     when:
-      ref:
-      - refs/heads/master
-      - refs/tags/*
+      event: [tag, push]
