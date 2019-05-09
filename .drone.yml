@@ -22,7 +22,9 @@ steps:
       dockerfile: Dockerfile
       auto_tag: true
     when:
-      branch: ['master', 'refs/tags/*']
+      ref:
+      - refs/heads/master
+      - refs/tags/*
 ---
 kind: pipeline
 name: arm64
@@ -48,4 +50,6 @@ steps:
       dockerfile: Dockerfile
       auto_tag: true
     when:
-      branch: ['master', 'refs/tags/*']
+      ref:
+      - refs/heads/master
+      - refs/tags/*
