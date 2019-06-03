@@ -32,12 +32,8 @@ module FlyingShuttle
       peer_addresses = peer_addresses + external_addresses
       peer_addresses.sort!
 
-      if peer_addresses != @previous_peers
-        logger.info { "peers: #{peer_addresses.join(',')}" }
-        set_peers(peer_addresses)
-      else
-        logger.info { "no changes detected" }
-      end
+      logger.info "peers: #{peer_addresses.join(',')}" if peer_addresses != @previous_peers
+      set_peers(peer_addresses)
 
       peer_addresses
     end
@@ -45,13 +41,16 @@ module FlyingShuttle
     # @param peer_addresses [Array<String>]
     # @return [Boolean]
     def set_peers(peer_addresses)
-      peers = peer_addresses.map { |addr| "peer[]=#{addr}"}.join("&")
+      peers = peer_addresses.map { |addr| "peer=#{addr}"}.join("&")
       response = weave_client.post(
         path: "/connect",
         body: "#{peers}&replace=true",
         headers: { "Content-Type" => "application/x-www-form-urlencoded" }
       )
-      return false unless response.status == 200
+      unless response.status == 200
+        logger.error "failed to connect peers: #{response.status} - #{response.body}"
+        return false
+      end
 
       @previous_peers = peer_addresses
 
