@@ -58,7 +58,7 @@ RSpec.describe FlyingShuttle::PeerService do
       expect(weave_client).to receive(:post).with(
         hash_including(
           path: '/connect',
-          body: 'peer[]=a&peer[]=b&replace=true'
+          body: 'peer=a&peer=b&replace=true'
         )
       ).and_return(response)
       expect(subject.set_peers(peers)).to be_truthy
@@ -66,11 +66,11 @@ RSpec.describe FlyingShuttle::PeerService do
 
     it 'returns false if peers cannot be set' do
       peers = ['a', 'b']
-      response = double(:response, status: 400)
+      response = double(:response, status: 400, body: '')
       expect(weave_client).to receive(:post).with(
         hash_including(
           path: '/connect',
-          body: 'peer[]=a&peer[]=b&replace=true'
+          body: 'peer=a&peer=b&replace=true'
         )
       ).and_return(response)
       expect(subject.set_peers(peers)).to be_falsey
