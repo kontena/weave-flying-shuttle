@@ -49,3 +49,26 @@ steps:
       auto_tag: true
     when:
       event: [tag, push]
+---
+kind: pipeline
+name: arm64
+platform:
+  os: linux
+  arch: amd64
+steps:
+  - name: manifest
+    image: plugins/manifest
+    settings:
+      username:
+        from_secret: hub_username
+      password:
+        from_secret: hub_password
+      target: docker.io/kontenapharos/weave-flying-shuttle:${DRONE_TAG}
+      template: quay.io/kontena/weave-flying-shuttle-ARCH:${DRONE_TAG}
+      platforms:
+        - linux/amd64
+        - linux/arm64
+      ignore_missing: true
+depends_on:
+  - amd64
+  - arm64
