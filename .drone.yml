@@ -61,8 +61,8 @@ steps:
         from_secret: hub_username
       password:
         from_secret: hub_password
-      target: docker.io/kontenapharos/weave-flying-shuttle:${DRONE_TAG}
-      template: docker.io/kontenapharos/weave-flying-shuttle-ARCH:${DRONE_TAG}
+      target: docker.io/kontenapharos/weave-flying-shuttle:${DRONE_TAG##v}
+      template: docker.io/kontenapharos/weave-flying-shuttle-ARCH:${DRONE_TAG##v}
       platforms:
         - linux/amd64
         - linux/arm64
