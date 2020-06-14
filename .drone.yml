@@ -13,12 +13,11 @@ steps:
   - name: docker
     image: plugins/docker
     settings:
-      registry: quay.io
       username:
-        from_secret: docker_username
+        from_secret: hub_username
       password:
-        from_secret: docker_password
-      repo: quay.io/kontena/weave-flying-shuttle-amd64
+        from_secret: hub_password
+      repo: docker.io/kontenapharos/weave-flying-shuttle-amd64
       dockerfile: Dockerfile
       auto_tag: true
     when:
@@ -39,12 +38,11 @@ steps:
   - name: docker
     image: plugins/docker
     settings:
-      registry: quay.io
       username:
-        from_secret: docker_username
+        from_secret: hub_username
       password:
-        from_secret: docker_password
-      repo: quay.io/kontena/weave-flying-shuttle-arm64
+        from_secret: hub_password
+      repo: docker.io/kontenapharos/weave-flying-shuttle-arm64
       dockerfile: Dockerfile
       auto_tag: true
     when:
@@ -64,7 +62,7 @@ steps:
       password:
         from_secret: hub_password
       target: docker.io/kontenapharos/weave-flying-shuttle:${DRONE_TAG}
-      template: quay.io/kontena/weave-flying-shuttle-ARCH:${DRONE_TAG}
+      template: docker.io/kontenapharos/weave-flying-shuttle-ARCH:${DRONE_TAG}
       platforms:
         - linux/amd64
         - linux/arm64
