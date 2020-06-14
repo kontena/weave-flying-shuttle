@@ -51,7 +51,7 @@ steps:
       event: [tag, push]
 ---
 kind: pipeline
-name: arm64
+name: manifest
 platform:
   os: linux
   arch: amd64
